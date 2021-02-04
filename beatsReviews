@@ -1,0 +1,53 @@
+library("rvest")
+library("tm")
+library("tidytext")
+library("reshape2")
+library("sentimentr")
+library("dplyr")
+library("tidyr")
+library("wordcloud")
+library("wordcloud2")
+library("devtools")
+library("tokenizers")
+install_github("lchiffon/wordcloud2")
+
+firstURL <- "https://www.amazon.com/Beats-Solo3-Wireless-Ear-Headphones/product-reviews/B01LRK9DTA/ref=cm_cr_getr_d_paging_btm_prev_1?ie=UTF8&reviewerType=all_reviews&pageNumber="
+firstReview <- html_text(html_nodes(read_html(firstURL), "span.review-text"))
+
+for(i in 2:199) #Beats Reviews from 1 to 199
+{
+  site <- paste(firstURL,toString(i), sep="")
+  sites <- html_text(html_nodes(read_html(site), "span.review-text"))
+  firstReview <- c(firstReview, sites)
+}
+firstReview
+
+ #simplifies everything!!!
+everyTokenWord <- tokenize_words(firstReview[1:1590], lowercase = TRUE, stopwords = NULL, simplify = FALSE) #makes all the key words into tokens
+alteredTokenWord <- paste(unlist(everyTokenWord), collapse =" ")
+tab <- table(tokenize_words(alteredTokenWord[[1]]))
+tab <- data.frame(word = names(tab), count = as.numeric(tab))
+tab <- arrange(tab, desc(count))
+tab
+
+base_url <- "https://programminghistorian.org/assets/basic-text-processing-in-r"
+wf <- read.csv(sprintf("%s/%s", base_url, "word_frequency.csv"))
+tab <- inner_join(tab, wf)
+tabrefined <- filter(tab, frequency < 0.002)
+wordcloud(tabrefined$word, tabrefined$count)
+
+bingcolorify <- function(tabrefined) {
+  bing <- get_sentiments("bing")
+  sentimentFrame <- left_join(tabrefined, bing)
+  colorvector <- NULL
+  for (i in 1:length(tabrefined$word)) {
+    if (identical(paste(sentimentFrame$sentiment[i]), "positive")) {
+      colorvector <- c(colorvector, "66FF33")
+    } else if (identical(paste(sentimentFrame$sentiment[i]), "negative")) {
+      colorvector <- c(colorvector, "FF0000")
+    } else {
+      colorvector <- c(colorvector, "000000")
+    }
+  }
+  return(colorvector)
+}
